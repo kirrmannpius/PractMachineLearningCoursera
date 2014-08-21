@@ -1,0 +1,126 @@
+---
+title: "Practical Machine Learning - Project"
+author: "Pius M. Kirrmann"
+date: "Thursday, August 21, 2014"
+output: html_document
+---
+
+# 1. Introduction    
+In this document we show how to apply the prediction tool *Random Forrest* to a
+data set obtained from weight lifting exercises. This dataset contains more than
+100 attributes.  
+After cleaning the dataset, we take a 60% training sample to build a model using the *Random Forrest* method. We perform cross-validation by applying the model to predict
+the values of the 40% testing sample.
+
+The data set can be downloaded from  http://groupware.les.inf.puc-rio.br/har     
+We thank the authors for making this data set available to the public:
+      
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+
+# 2. Data Cleaning     
+The data set has to be pre-processed since it does not meet the criteria for a tidy
+data set (http://vita.had.co.nz/papers/tidy-data.pdf). For example, there are a lot of
+NAs, some errors like DIV/0 and sparse columns.
+Our steps of pre-processing are explained in the R-code below.     
+```{r}
+# Read training and test data (stored in the working directory)
+trainingPML <- read.csv("pml-training.csv")
+testingPML <- read.csv("pml-testing.csv")
+# Clean training data set.
+# Rows with new_window = 'yes' contain DIV/0 errors. We don't use them.
+nw_ind <- which(trainingPML$new_window=="yes")
+trainingPML <- trainingPML[-nw_ind,]
+# Throw away all columns with NA's and all sparse columns.
+# This can be done by visual inspection. Upload the data into a spreadsheet and
+# remove all columns that do not contain tidy data.
+# We also remove the timestamps.
+# Call the names-function   names(trainingPML)   to get the indices of the 
+# columns to be removed. Put these into an index-vector:
+indTidy <- c(2,8:11,37:49,61:68,84:86,102,113:124,140,151:160)
+# Reduce training/testing data set 
+trainingPML0 <- trainingPML[,indTidy]
+testingPML0 <- testingPML[,indTidy]
+# Coerce user_name to numeric
+trainingPML0$user_name <- as.numeric(trainingPML0$user_name)
+testingPML0$user_name <- as.numeric(testingPML0$user_name)
+```
+     
+There are more sophisticated methods in pre-processing, see for example    
+https://topepo.github.io/caret/preprocess.html     
+After playing around with different pre-processing and prediction methods,
+we found that for our purpose, these pre-processing steps are not necessary.
+
+# 3. Training Phase      
+According to the cross-validation procedure, we take a portion of the data set
+as training set to build the model. We rely on the 60/40 rule of thumb, i.e.
+we take a 60% for training and keep the other portion for cross-validation.
+This strategy avoids overfitting in most cases.
+
+We apply the Random Forrest algorithm in the randomForrest R-package for training.
+After performing several tests, we found that this algorithm produces the best
+results with optimal performance.
+
+```{r}
+# Take a 60% sample of the training set for training
+# The other portion is used for cross validation
+library(caret)
+indTrain <- createDataPartition(y=trainingPML0$classe, p=0.6, list=FALSE)
+trainingPML <- trainingPML0[indTrain,]
+testingPML <- trainingPML0[-indTrain,]
+
+# Apply Random Forrest method for prediction
+library(randomForest)
+classe_training <- as.factor(trainingPML$classe)
+attributes_training <- trainingPML[,2:52]
+RFtraining <- randomForest(attributes_training, classe_training, importance=TRUE)
+# Report OOB (out-of-bag) estimate of error rate and show confusion matrix
+RFtraining
+```
+
+There are a lot of nice features in the randomForrest package. For example, we can
+easily show the most important predictors.
+
+```{r}
+# Plot variables of importance
+varImpPlot(RFtraining, type=1, n.var=15)
+```
+
+The following plot illustrates how the error rate decreases with an increasing number
+of trees. 
+
+```{r}
+# Plot error rate vs. number of trees
+plot(RFtraining)
+```
+
+# 4. In and Out Sample Errors      
+The model has been built on the training set. Therefore, we expect a low error
+rate if we apply the model to predict the values of the training set 
+(in sample error).      
+```{r}
+# in sample error rate
+classe_predicted_training <- predict(RFtraining, trainingPML)
+predictTraining <- data.frame(classe_predicted_training)
+predictTraining$classe <- trainingPML$classe
+predictTraining$success = (predictTraining$classe_predicted_training==predictTraining$classe)
+summary(predictTraining)
+```
+
+Now we check the *out of sample error*. 
+For that purpose, we apply the model, which was
+derived using the 60% training sample, to the remaining 40% testing sample.
+This procedure is called cross validation.
+
+```{r}
+# out of sample error
+classe_predicted_testing <- predict(RFtraining, testingPML)
+predictTesting <- data.frame(classe_predicted_testing)
+predictTesting$classe <- testingPML$classe
+predictTesting$success = (predictTesting$classe_predicted_testing==predictTesting$classe)
+summary(predictTesting)
+```
+
+As can be seen from the summary, the out of sample error rate is low,
+i.e. the *Random Forrest* is a good prediction method for our data set.
+
