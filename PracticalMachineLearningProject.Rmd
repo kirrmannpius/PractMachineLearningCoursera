@@ -23,6 +23,9 @@ The data set has to be pre-processed since it does not meet the criteria for a t
 data set (http://vita.had.co.nz/papers/tidy-data.pdf). For example, there are a lot of
 NAs, some errors like DIV/0 and sparse columns.
 Our steps of pre-processing are explained in the R-code below.     
+Please note that the target variable which we want to predict is called *classe*. 
+It is in the last column of the data set. All other variables can be used as 
+predicors.
 ```{r}
 # Read training and test data (stored in the working directory)
 trainingPML <- read.csv("pml-training.csv")
@@ -93,6 +96,9 @@ of trees.
 # Plot error rate vs. number of trees
 plot(RFtraining)
 ```
+      
+The error rate is very low for all classes. 
+This will be confirmed in the next section.
 
 # 4. In and Out Sample Errors      
 The model has been built on the training set. Therefore, we expect a low error
@@ -106,6 +112,7 @@ predictTraining$classe <- trainingPML$classe
 predictTraining$success = (predictTraining$classe_predicted_training==predictTraining$classe)
 summary(predictTraining)
 ```
+The model perfectly fits to the training set.
 
 Now we check the *out of sample error*. 
 For that purpose, we apply the model, which was
@@ -117,10 +124,18 @@ This procedure is called cross validation.
 classe_predicted_testing <- predict(RFtraining, testingPML)
 predictTesting <- data.frame(classe_predicted_testing)
 predictTesting$classe <- testingPML$classe
-predictTesting$success = (predictTesting$classe_predicted_testing==predictTesting$classe)
+predictTesting$success <- (predictTesting$classe_predicted_testing==predictTesting$classe)
 summary(predictTesting)
 ```
-
+      
+Let's calculate the error rate in percent:
+```{r}
+length(which(predictTesting$success == FALSE)) * 100 / length(predictTesting$success)
+```
+      
 As can be seen from the summary, the out of sample error rate is low,
 i.e. the *Random Forrest* is a good prediction method for our data set.
+    
+
+
 
